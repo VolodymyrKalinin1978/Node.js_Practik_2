@@ -1,28 +1,25 @@
-import express, { json } from 'express';
+import express from 'express';
 import cors from 'cors';
 import { v4 } from 'uuid';
 import { promises as fs } from 'fs';
 
 const app = express();
 
-// Utels Get users from Json
-async function getUser() {
-  try {
-    const usersDB = await fs.readFile('./data.json');
-    const users = JSON.parse(usersDB);
-    return users;
-  } catch (error) {
-  console.log(error);
-  }
+// The function for receiving users from a file
+async function getUsersFromFile() {
+  const usersDB = await fs.readFile('./data.json');
+  return JSON.parse(usersDB);
 }
 
 // MIDDELWARE-------------------------------------------------
 // bulit in
 app.use(express.json());
+app.use(cors());
 
 // Castom Middekware
 app.use((req, res, next) => {
-console.log('Heloo from Middelware!!!');
+ console.log('Heloo from Middelware!!!');
+
   next();
 });
 
@@ -33,7 +30,7 @@ app.use('/users/:id', async (req, res, next) => {
     console.log(id);
 
     // TEMP Save data to data.json its vsrtual DB
-    const users = await getUser();
+    const users = await getUsersFromFile();
     const user = users.find((item) => item.id === id);
 
     if (!user) {
@@ -42,16 +39,12 @@ app.use('/users/:id', async (req, res, next) => {
       });
     }
 
-    // Send user for Delete
-    const userDel = users.filter((u) => u.id !== id);
-
-    req.user = user;
-    req.users = users;
-    req.userDel = userDel;
-
     next();
   } catch (error) {
     console.log(error);
+    res.status(500).json({
+      message: 'Internal server error .....;',
+    });
   }
 });
 
@@ -80,6 +73,7 @@ app.get('/ping', (req, res) => {
 app.post('/users', async (req, res) => {
   try {
     const { name, year, country } = req.body;
+    const users = await getUsersFromFile();
 
     const newUser = {
       id: v4(),
@@ -88,10 +82,10 @@ app.post('/users', async (req, res) => {
       country
     };
 
-    const users = await getUser();
     users.push(newUser);
 
     await fs.writeFile('./data.json', JSON.stringify(users));
+
     // Respons status
 
     res.status(201).json({
@@ -101,23 +95,35 @@ app.post('/users', async (req, res) => {
 console.table(req.body);
   } catch (error) {
     console.log(error);
+    res.status(500).json({
+      message: 'Internal server error .....;',
+    });
   }
 });
 //--------------------------------------------------------------------
 // Read meny
 app.get('/users', async (req, res) => {
-  // TEMP Save data to data.json its vsrtual DB
-  const users = await getUser();
+  try {
+    const users = await getUsersFromFile();
+    // TEMP Save data to data.json its vsrtual DB
 
-  res.status(200).json({
-    msg: 'seccess',
-    users,
-  });
+    res.status(200).json({
+      msg: 'seccess',
+      users,
+    });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({
+      message: 'Internal server error .....;',
+    });
+  }
 });
 //-------------------------------------------------------------------
 // Read one
-app.get('/users/:id', (req, res) => {
-  const { user } = req;
+app.get('/users/:id', async (req, res) => {
+  const { id } = req.params;
+  const users = await getUsersFromFile();
+  const user = users.find((item) => item.id === id);
 
   res.status(200).json({
     msg: 'seccess',
@@ -128,8 +134,10 @@ app.get('/users/:id', (req, res) => {
 // Update
 app.patch('/users/:id', async (req, res) => {
   try {
+    const { id } = req.params;
     const { name, year, country } = req.body;
-    const { user, users } = req;
+    const users = await getUsersFromFile();
+    const user = users.find((item) => item.id === id);
 
     if (name) {
       user.name = name;
@@ -150,20 +158,28 @@ app.patch('/users/:id', async (req, res) => {
     });
   } catch (error) {
     console.log(error);
+    res.status(500).json({
+      message: 'Internal server error .....;',
+    });
   }
 });
 //---------------------------------------------------------------------
 // Delete
 app.delete('/users/:id', async (req, res) => {
   try {
-    const { userDel } = req;
+    const { id } = req.params;
+    const users = await getUsersFromFile();
+    const user = users.filter((u) => u.id !== id);
 
-    await fs.writeFile('./data.json', JSON.stringify(userDel));
+    await fs.writeFile('./data.json', JSON.stringify(user));
 
     // Respons status
     res.sendStatus(204);
   } catch (error) {
     console.log(error);
+    res.status(500).json({
+      message: 'Internal server error .....;',
+    });
   }
 });
 
